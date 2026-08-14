@@ -312,15 +312,17 @@ async function runGit(ctx, args, cwd) {
 
 // 第 4 级：绕过 shell 执行器，用 ctx.subprocess 直接以绝对路径 spawn /bin/sh，
 // 并在命令内部 export 标准 PATH，完全不依赖宿主环境的 bash 查找与沙箱 runner。
+// 注意：cwd 固定用 '/'（插件上下文里指定其他 cwd 会导致 spawn ENOENT），
+// 仓库目录通过 git -C 传入。
 async function runGitDirect(ctx, args, cwd) {
   const sub = ctx.get('subprocess')
   if (!sub) return null
   try {
-    const cmd = 'export PATH="' + STANDARD_PATH + '"; exec git ' + args.map(quote).join(' ')
+    const cmd = 'export PATH="' + STANDARD_PATH + '"; exec git -C ' + quote(cwd) + ' ' + args.map(quote).join(' ')
     const handle = sub.spawn({
       argv: ['/bin/sh', '-c', cmd],
-      cwd: cwd,
-      stdio: { stdin: 'ignore', stdout: { maxBytes: 8 * 1024 * 1024 }, stderr: { maxBytes: 8 * 1024 * 1024 } },
+      cwd: '/',
+      stdio: { stdin: 'ignore', stdout: { maxBytes: 4 * 1024 * 1024 }, stderr: { maxBytes: 4 * 1024 * 1024 } },
       graceMs: 3000,
       env: { PATH: STANDARD_PATH },
     })
