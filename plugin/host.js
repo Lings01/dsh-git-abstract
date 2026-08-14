@@ -136,7 +136,7 @@ async function computeSummary(ctx, explicit, startHint) {
   }
 
   const branchR = await runGit(ctx, ['rev-parse', '--abbrev-ref', 'HEAD'], repo)
-  const branch = branchR.ok ? branchR.stdout : null
+  const branch = branchR.ok ? branchR.stdout.trim() : null
   if (!branchR.ok && branchR.stderr) debug.branchErr = branchR.stderr
   if (branchR.attempt) debug.attempt = String(branchR.attempt)
   out.branch = branch === 'HEAD' ? '(detached HEAD)' : (branch || null)
@@ -168,7 +168,7 @@ async function computeSummary(ctx, explicit, startHint) {
 
   const upR = await runGit(ctx, ['rev-parse', '--abbrev-ref', '@{upstream}'], repo)
   if (upR.ok) {
-    out.upstream = upR.stdout
+    out.upstream = upR.stdout.trim()
     const abR = await runGit(ctx, ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'], repo)
     if (abR.ok) {
       const m = abR.stdout.trim().split(/\s+/)
@@ -370,14 +370,14 @@ async function probeEnv(ctx) {
 async function detectRepo(ctx, explicit, startHint) {
   if (explicit) {
     const r = await runGit(ctx, ['rev-parse', '--show-toplevel'], explicit)
-    if (r.ok && r.stdout) return r.stdout
+    if (r.ok && r.stdout) return r.stdout.trim()
     return { error: '路径不是可用的 git 仓库: ' + explicit + '（' + (r.stderr || ('exit ' + r.exitCode)) + '）' }
   }
   const sp = ctx.get('sandboxPolicy')
   let dir = startHint || (sp && sp.workspaceRoot) || '/'
   while (true) {
     const r = await runGit(ctx, ['rev-parse', '--show-toplevel'], dir)
-    if (r.ok && r.stdout) return r.stdout
+    if (r.ok && r.stdout) return r.stdout.trim()
     const next = dir.replace(/\/[^/]*$/, '') || '/'
     if (next === dir) return null
     dir = next
