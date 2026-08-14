@@ -1,103 +1,103 @@
-# 使用教程
+# Usage Tutorial
 
-本文档说明 Git 变更摘要面板的每个部分以及常见操作。
+Every part of the Git change summary panel, plus common operations.
 
-> **English: [USAGE.en.md](USAGE.en.md)**
+> **中文版见 [USAGE.zh.md](USAGE.zh.md)** / Chinese docs: [USAGE.zh.md](USAGE.zh.md).
 
-## 打开与关闭面板
+## Open & Close
 
-- 点击**会话头部、Session log 旁边的 ⑂ 按钮**打开面板；再点一次、或点面板右上角 **✕** 关闭。
-- 面板顶部有 **⟳ 刷新** 按钮，手动重新计算。
+- Click the **⑂ button at the top-right** of the page to open the panel; click it again, or click **✕** in the panel header, to close.
+- The panel header has a **⟳ refresh** button to recompute manually.
 
-## 仓库定位
+## Repo Resolution
 
-面板打开的仓库由以下规则决定：
+Which repo the panel shows is decided as follows:
 
-1. **自动探测（默认）**：从**当前会话工作区**开始，向上查找最近的 git 仓库（`git rev-parse --show-toplevel`）。例如工作区是 `/home/user/proj/subdir` 而仓库在 `/home/user/proj`，会自动定位到仓库根目录。
-2. **手动指定**：在顶部输入框填入仓库路径，回车或点 **应用**。
-3. **自动跟随工作区**：切换 DSH 工作区后，面板自动清空旧数据并按新工作区重新计算；手动指定过路径时会继续使用该路径。
+1. **Auto-detect (default)**: walk **up from the current session workspace** to the nearest git repo (`git rev-parse --show-toplevel`). E.g. workspace is `/home/user/proj/subdir` but the repo is at `/home/user/proj` — the repo root is resolved automatically.
+2. **Manual**: type a repo path in the input at the top, press Enter or click **Apply**.
+3. **Follows the workspace**: after switching DSH workspaces the panel clears stale data and recomputes for the new workspace; if you entered a manual path, that path keeps being used.
 
-## 面板内容详解
+## Panel Reference
 
-### 概览卡片（顶部）
+### Overview cards (top)
 
-| 卡片 | 含义 |
+| Card | Meaning |
 | --- | --- |
-| 文件数 | 相对 HEAD 有变更的文件总数（含二进制） |
-| 新增行 | 相对 HEAD 新增的总行数（绿色） |
-| 删除行 | 相对 HEAD 删除的总行数（红色） |
-| 净变化 | 新增 − 删除（带正负号） |
-| 未跟踪 | 未跟踪文件数量（`git ls-files --others`） |
+| Files | Total files with changes vs HEAD (incl. binary) |
+| Added | Total added lines vs HEAD (green) |
+| Deleted | Total deleted lines vs HEAD (red) |
+| Net | Added − deleted (signed) |
+| Untracked | Number of untracked files (`git ls-files --others`) |
 
-### 元信息
+### Meta info
 
-- **仓库**：实际使用的仓库根目录
-- **基分支**：自动探测的分支（upstream → `origin/<当前分支>` → `origin/main` → `origin/master` → `main` → `master` → `develop`），用于计算"分支提交"
-- **upstream**：远程跟踪分支，以及领先（+）与落后（−）的提交数
-- **HEAD**：短 hash、提交信息、作者、提交时间
+- **Repo**: the repo root actually used
+- **Base branch**: auto-detected (upstream → `origin/<branch>` → `origin/main` → `origin/master` → `main` → `master` → `develop`); used for the "branch commits" section
+- **Upstream**: remote-tracking branch, plus commits ahead (+) / behind (−)
+- **HEAD**: short hash, subject, author, commit date
 
-### 未提交变更（可折叠区块）
+### Uncommitted changes (collapsible)
 
-- **未提交变更（相对 HEAD）**：工作区所有未提交修改的总和（已暂存 + 未暂存）
-- **已暂存 (staged)**：`git add` 过的部分
-- **未暂存 (unstaged)**：改了但还没 `git add` 的部分
+- **Uncommitted vs HEAD**: every uncommitted modification (staged + unstaged)
+- **Staged**: changes added with `git add`
+- **Unstaged**: modified but not yet `git add`-ed
 
-每个文件一行：**状态徽标 + 路径 + `+x −y` 行数**（二进制文件显示"二进制"）。
+Each file row: **status badge + path + `+x −y` lines** (binary files show "binary").
 
-### 状态徽标图例
+### Status badge legend
 
-| 徽标 | 含义 | 颜色 |
+| Badge | Meaning | Color |
 | --- | --- | --- |
-| 改 M | 修改 | 中性灰 |
-| 增 A | 新增 | 绿色 |
-| 删 D | 删除 | 红色 |
-| 移 R | 重命名（`旧路径 → 新路径`） | 琥珀 |
-| 新 U | 未跟踪 | 灰 |
+| M | Modified | Neutral gray |
+| A | Added | Green |
+| D | Deleted | Red |
+| R | Renamed (`old → new`) | Amber |
+| U | Untracked | Gray |
 
-### 分支提交（领先基分支）
+### Branch commits (ahead of base)
 
-- 当前分支领先基分支的**提交列表**（hash + 提交信息，不含 merge 提交）
-- 这些提交**合并起来的差异统计**（文件数 / +行 / −行）
+- List of commits on the current branch not in the base (**no merge commits**), with hash + subject
+- **Combined diff stats** of those commits (files / +lines / −lines)
 
-### 文件明细（按变更量排序）
+### File details (sorted by change magnitude)
 
-- **变更最多 TOP5**：按（新增+删除）行数最大的 5 个文件
-- **按扩展名**：如 `.py`、`.js`、`.md` 各自的文件数和行数变化
-- **按顶层目录**：仓库顶层目录维度的聚合统计
+- **TOP5 most changed**: the 5 files with the largest (added + deleted) counts
+- **By extension**: e.g. `.py`, `.js`, `.md` — file counts and line changes each
+- **By top-level directory**: aggregation across the repo's top-level dirs
 
-### 附加检查
+### Extra checks
 
-- **未跟踪文件**：数量 + 前 10 个路径
-- **二进制文件**：无行数统计、只计文件数的变更
-- **冲突标记**：`git diff --check` 发现的 `<<<<<<<` 冲突标记数量（琥珀色告警）
-- **空白错误**：`git diff --check` 报告的空白错误数量
-- **最近提交**：仓库最近 5 条提交（hash + 信息）
+- **Untracked files**: count + first 10 paths
+- **Binary files**: changes without line counts, counted per file
+- **Conflict markers**: `<<<<<<<` markers found by `git diff --check` (amber warning)
+- **Whitespace errors**: reported by `git diff --check`
+- **Recent commits**: last 5 commits of the repo (hash + subject)
 
-### 调试区（仅异常时显示）
+### Debug area (only on abnormal cases)
 
-当发生错误或走了环境降级（`attempt > 1`）时，面板底部会显示灰色小字调试区：
+When there is an error or a degraded execution path (`attempt > 1`), the panel bottom shows a small monospace debug block:
 
-- `repo` / `start` / `fallback`：实际使用的仓库路径、探测起点、兜底根目录
-- `attempt`：命中的执行级别（1 默认 / 2 标准 PATH / 3 无沙箱 / 4 subprocess 直连）
-- `probe`：插件环境里的 PATH 与 `git`/`bash`/`sh` 解析结果
-- `branchErr` / `headErr`：失败命令的错误信息
+- `repo` / `start` / `fallback`: repo path used, detection start, fallback root
+- `attempt`: execution level hit (1 default / 2 standard PATH / 3 unsandboxed / 4 subprocess direct)
+- `probe`: the plugin environment's PATH and whether `git`/`bash`/`sh` resolve
+- `branchErr` / `headErr`: stderr of the failed commands
 
-正常情况（默认路径、无错误）不显示调试区。
+The debug area is hidden on the normal path (no error, `attempt` 1).
 
-## 常见操作
+## Common Operations
 
-| 操作 | 方法 |
+| Action | How |
 | --- | --- |
-| 重新计算 | 点面板顶部 ⟳ |
-| 切换仓库 | 输入框填路径 → 回车 / 应用 |
-| 回到自动探测 | 清空输入框 → 应用 |
-| 折叠/展开区块 | 点击区块标题 |
-| 看完整文件列表 | 区块内列表可滚动（最多约 220px 高） |
+| Recompute | Click ⟳ in the panel header |
+| Switch repo | Enter a path in the input → Enter / Apply |
+| Back to auto-detect | Clear the input → Apply |
+| Collapse / expand a section | Click the section title |
+| See the full file list | Lists scroll (up to ~220px) |
 
-## 主题与配色
+## Theme & Colors
 
-面板使用 DSH 主题 token（`--dsw-alias-*`），自动跟随 DSH 的浅色/深色主题：
+The panel uses DSH theme tokens (`--dsw-alias-*`) and follows DSH light/dark themes automatically:
 
-- 面板/卡片/分区背景：`bg-overlay` / `bg-layer-1` / `bg-layer-2`
-- 文字：`label-primary`（主要）/ `label-secondary`（次要）
-- 语义色：新增绿 `#22c55e`、删除红 `#ec1313`、冲突/警告琥珀 `#f59e0b`
+- Panel/card/section backgrounds: `bg-overlay` / `bg-layer-1` / `bg-layer-2`
+- Text: `label-primary` / `label-secondary`
+- Semantic colors: added green `#22c55e`, deleted red `#ec1313`, conflict/warning amber `#f59e0b`

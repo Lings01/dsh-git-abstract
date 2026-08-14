@@ -1,101 +1,100 @@
-# 安装教程
+# Installation Tutorial
 
-本文档说明如何在 DeepSeek Harness (DSH) 中安装、激活、更新、停止本插件。
+How to install, activate, update, and stop this plugin in DeepSeek Harness (DSH).
 
-> **English: [INSTALL.en.md](INSTALL.en.md)**
+> **中文版见 [INSTALL.zh.md](INSTALL.zh.md)** / Chinese docs: [INSTALL.zh.md](INSTALL.zh.md).
 
-## 前置条件
+## Prerequisites
 
-- **DeepSeek Harness 环境**：提供 `shell` / `subprocess` / `slots` 等服务，以及 `harness`、`React`、`host`、`styles` 等运行时能力
-- **git ≥ 2.23**：位于标准系统目录（如 `/usr/bin/git`）或宿主 PATH 中
-- **bubblewrap（`bwrap`）可选**：缺失时插件自动降级为无沙箱执行，不影响功能
-- 一个**目标 git 仓库**：插件展示的是某个 git 仓库的变更（默认取当前会话工作区所在仓库）
+- **DeepSeek Harness environment**: provides `shell` / `subprocess` / `slots` services and the `harness`, `React`, `host`, `styles` runtime capabilities
+- **git ≥ 2.23**: in a standard system directory (e.g. `/usr/bin/git`) or on the host PATH
+- **bubblewrap (`bwrap`) optional**: when missing, the plugin automatically falls back to unsandboxed execution
+- A **target git repo**: the plugin shows changes of some git repo (by default the repo of the current session workspace)
 
-## 安装步骤
+## Install
 
-### 1. 获取代码
+### 1. Get the code
 
-任选其一：
+Either:
 
 ```bash
-# 克隆仓库
 git clone https://github.com/Lings01/dsh-git-abstract.git
-# 或者只取两个插件文件
-cp dsh-git-abstract/plugin/host.js   <你的目录>/host.js
-cp dsh-git-abstract/plugin/client.js <你的目录>/client.js
+# or just copy the two plugin files
+cp dsh-git-abstract/plugin/host.js   <your-dir>/host.js
+cp dsh-git-abstract/plugin/client.js <your-dir>/client.js
 ```
 
-### 2. 在 DSH 会话中定义插件
+### 2. Define the plugin in a DSH session
 
-本插件是**动态 Cordis 插件**，不需要 npm 安装或构建。在 DSH 会话中让 agent 执行 `cordis_define`：
+This is a **dynamic Cordis plugin** — no npm install or build is needed. In a DSH session, ask the agent to run `cordis_define`:
 
-- `code.host` ← `plugin/host.js` 的全部内容
-- `code.client` ← `plugin/client.js` 的全部内容
+- `code.host` ← the full content of `plugin/host.js`
+- `code.client` ← the full content of `plugin/client.js`
 
-**示例对话**（把下面的内容发给会话中的 agent 即可）：
+**Example prompt** (send this to the agent in your session):
 
-> 请用 `cordis_define` 定义这个 Cordis 插件：
-> - code.host 使用 `plugin/host.js` 的内容
-> - code.client 使用 `plugin/client.js` 的内容
-> - 名称：Git 变更摘要按钮
+> Please define this Cordis plugin with `cordis_define`:
+> - `code.host` from the content of `plugin/host.js`
+> - `code.client` from the content of `plugin/client.js`
+> - Name: Git Change Summary Button
 >
-> 定义完成后用 `cordis_run` 激活它。
+> After defining, activate it with `cordis_run`.
 
-agent 会返回 `pluginId` / `packageId`，例如 `gitsum-2/pkg-30`。
+The agent returns `pluginId` / `packageId`, e.g. `gitsum-2/pkg-30`.
 
-### 3. 激活插件
+### 3. Activate
 
-调用 `cordis_run` 激活对应 Package：
+Call `cordis_run` for the returned Package:
 
 ```text
 cordis_run(pluginId: <pluginId>, packageId: <packageId>, mode: "run")
 ```
 
-- **首次激活**：Client 半部需要在浏览器端授权（在界面上允许）。授权一次后，同一插件的后续版本可继续运行。
-- 激活成功后，页面**右上角出现 ⑂ 按钮**即安装完成。
+- **First activation**: the Client half needs browser-side approval (allow it in the UI). After one-time approval, later versions of the same plugin can run without re-approving.
+- Once active, the **⑂ button appears at the top-right** of the page.
 
-### 4. 验证
+### 4. Verify
 
-点击 ⑂ 打开面板：
+Click ⑂ to open the panel:
 
-- 若当前工作区（或其父目录）是 git 仓库，面板直接显示该仓库的变更摘要；
-- 否则提示未找到仓库，可在面板输入框手动指定仓库路径（见[使用教程](USAGE.md)）。
+- If the current workspace (or a parent directory) is a git repo, the panel shows its change summary directly;
+- Otherwise it reports "no git repo found" — enter a repo path manually in the input (see [Usage](USAGE.md)).
 
-## 更新插件
+## Updating the Plugin
 
-插件代码更新后，用同一 `pluginId` 定义新 Package，然后 `cordis_run(mode: "update")` 切换：
+Define a new Package under the same `pluginId`, then switch with `cordis_run(mode: "update")`:
 
 ```text
-cordis_define(plugin: { kind: "existing", pluginId: <pluginId> }, code: { host: <新host代码>, client: <新client代码> })
-cordis_run(pluginId: <pluginId>, packageId: <新packageId>, mode: "update")
+cordis_define(plugin: { kind: "existing", pluginId: <pluginId> }, code: { host: <new-host-code>, client: <new-client-code> })
+cordis_run(pluginId: <pluginId>, packageId: <new-packageId>, mode: "update")
 ```
 
-更新失败不会自动回滚旧版本；可对 `currentPackageId` 执行 `mode: "run"` 回滚。
+A failed update does not auto-restore the old version; roll back by running `currentPackageId` with `mode: "run"`.
 
-## 停止 / 移除插件
+## Stop / Remove
 
-- **临时停止**：`cordis_stop(pluginId)` —— 保留定义和版本，之后可 `run`/`update` 恢复。
-- **永久移除**：`cordis_undefine(pluginId)` —— 删除所有 Package 和授权记录。
+- **Temporarily stop**: `cordis_stop(pluginId)` — keeps definitions and versions; resume later with `run`/`update`.
+- **Permanently remove**: `cordis_undefine(pluginId)` — deletes all Packages and grants.
 
-## 跨环境兼容
+## Cross-Environment Compatibility
 
-插件执行 git 命令时按需自动降级，不依赖宿主环境的 PATH 完整性和沙箱 runner 是否可用：
+The plugin executes git commands with automatic fallbacks, independent of host PATH completeness and sandbox runner availability:
 
-| 级别 | 做法 | 解决什么问题 |
+| Level | Approach | Solves |
 | --- | --- | --- |
-| 1 | 默认请求 | 宿主 PATH / 沙箱正常时直接可用（绝大多数部署） |
-| 2 | 显式标准 PATH（`/usr/bin:/bin` 等） | 宿主执行环境 PATH 缺少系统目录（`bash`/`bwrap`/`git` 找不到，如 `spawn bash ENOENT`） |
-| 3 | 标准 PATH + 无沙箱（`danger-full-access`） | 沙箱 runner（bubblewrap）缺失或无法启动（如 `spawn bwrap ENOENT`） |
-| 4 | `ctx.subprocess` 直连：绝对路径 `/bin/sh` + 命令内 `export PATH` + `git -C` | 以上 shell 层全部失败时的最后手段 |
+| 1 | Default request | Normal deployments with healthy PATH/sandbox (most cases) |
+| 2 | Explicit standard PATH (`/usr/bin:/bin` etc.) | Host execution PATH misses system dirs (`bash`/`bwrap`/`git` not found, e.g. `spawn bash ENOENT`) |
+| 3 | Standard PATH + unsandboxed (`danger-full-access`) | Sandbox runner (bubblewrap) missing/unspawnable (e.g. `spawn bwrap ENOENT`) |
+| 4 | Direct `ctx.subprocess`: absolute `/bin/sh` + in-command `export PATH` + `git -C` | Last resort when all shell layers fail |
 
-> git 命令全部只读，第 3/4 级无沙箱执行是安全的。
+> All git commands are read-only; unsandboxed execution at levels 3–4 is safe.
 
-面板在出错或发生降级（`attempt > 1`）时会显示调试区，包含实际命中的级别（`attempt: 1/2/3/4`）与环境探测信息，便于排查。
+On error or a degraded path (`attempt > 1`), the panel shows a debug area with the level used (`attempt: 1/2/3/4`) and environment probe info.
 
-## 常见安装问题
+## Installation Troubleshooting
 
-| 问题 | 处理 |
+| Problem | Fix |
 | --- | --- |
-| `cordis_define` 报语法错误 | 确认代码与 `plugin/*.js` 完全一致（plain JavaScript，无 JSX/TS/import） |
-| 激活后没有按钮 | 检查是否完成浏览器端授权；刷新页面重试 |
-| 面板报 `spawn ... ENOENT` | 属环境 PATH/沙箱问题，插件会自动降级；仍失败请确认 `git`/`bash` 在标准目录或宿主 PATH 中 |
+| `cordis_define` syntax error | Make sure the code matches `plugin/*.js` exactly (plain JavaScript, no JSX/TS/import) |
+| No button after activation | Check that browser approval was completed; refresh the page |
+| Panel reports `spawn ... ENOENT` | Environment PATH/sandbox issue; the plugin degrades automatically — if it still fails, ensure `git`/`bash` are in a standard location or on the host PATH |
