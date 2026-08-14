@@ -16,6 +16,10 @@ function quote(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'"
 }
 
+// 标准系统目录 PATH：覆盖 bash / bwrap / git 的常规安装位置。
+// 宿主执行环境 PATH 不完整（如缺少 /usr/bin）时用于降级，不依赖特定机器的路径。
+const STANDARD_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/git/bin:/opt/homebrew/bin:/opt/local/bin'
+
 function parseNumstat(text) {
   const files = []
   for (const line of String(text || '').split('\n')) {
@@ -114,7 +118,7 @@ return {
 async function computeSummary(ctx, explicit, startHint) {
   const sp = ctx.get('sandboxPolicy')
   const fallbackRoot = (sp && sp.workspaceRoot) || ''
-  const debug = { startHint: startHint || '', fallbackRoot: fallbackRoot, repo: '', branchErr: '', headErr: '' }
+  const debug = { startHint: startHint || '', fallbackRoot: fallbackRoot, repo: '', branchErr: '', headErr: '', attempt: '' }
   const root = await detectRepo(ctx, explicit, startHint || fallbackRoot)
   if (root === null) return { ok: false, error: '未找到 git 仓库（已尝试会话工作区及其父目录），可在面板里输入仓库路径', debug: debug }
   if (root.error) return { ok: false, error: root.error, debug: debug }
@@ -134,6 +138,7 @@ async function computeSummary(ctx, explicit, startHint) {
   const branchR = await runGit(ctx, ['rev-parse', '--abbrev-ref', 'HEAD'], repo)
   const branch = branchR.ok ? branchR.stdout : null
   if (!branchR.ok && branchR.stderr) debug.branchErr = branchR.stderr
+  if (branchR.attempt) debug.attempt = String(branchR.attempt)
   out.branch = branch === 'HEAD' ? '(detached HEAD)' : (branch || null)
 
   const headR = await runGit(ctx, ['rev-parse', '--short', 'HEAD'], repo)
@@ -252,45 +257,46 @@ function buildSection(nsR, nsrR) {
 async function runGit(ctx, args, cwd) {
   const shell = ctx.get('shell')
   if (!shell) return { ok: false, exitCode: -1, stdout: '', stderr: 'shell 服务不可用' }
-  const attempt = async function (policy) {
-    const spec = shell.resolve({
-      command: 'git ' + args.map(quote).join(' '),
-      workdir: cwd,
-      timeoutMs: 30000,
-      stdoutMaxBytes: 8 * 1024 * 1024,
-      ...(policy ? { sandboxPolicy: policy } : {}),
-    })
-    const res = await shell.run(spec)
-    return {
-      ok: res.exitCode === 0,
-      exitCode: res.exitCode,
-      stdout: (res.stdout && res.stdout.text) || '',
-      stderr: (res.stderr && res.stderr.text) || '',
-      denied: !!(res.sandbox && res.sandbox.denied),
-      runnerFailed: !!(res.sandbox && res.sandbox.runnerFailed),
-    }
-  }
-  const unsandboxed = async function () {
-    const sp = ctx.get('sandboxPolicy')
-    const root = (sp && sp.workspaceRoot) || '/'
-    return attempt({ mode: 'danger-full-access', workspaceRoot: root })
-  }
-  try {
-    const r = await attempt(null)
-    if (!r.runnerFailed) return r
-    // 沙箱 runner 不可用（如 bwrap 缺失/无法启动）→ 降级为无沙箱重试（git 只读命令）
-    return await unsandboxed()
-  } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e)
-    if (/spawn .* ENOENT|SandboxUnavailable|runner/i.test(msg)) {
-      try {
-        return await unsandboxed()
-      } catch (e2) {
-        return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + ((e2 && e2.message) ? e2.message : String(e2)) }
+  const sp = ctx.get('sandboxPolicy')
+  const root = (sp && sp.workspaceRoot) || '/'
+  // 多级尝试，适应不同部署环境：
+  //   1) 默认请求 —— 宿主 PATH/沙箱正常时直接可用
+  //   2) 显式标准 PATH —— 宿主 PATH 缺少系统目录（bash/bwrap/git 找不到）时
+  //   3) 标准 PATH + 无沙箱 —— 沙箱 runner（bwrap）缺失或无法启动时
+  // git 命令全部只读，第 3 级无沙箱执行是安全的。
+  const attempts = [
+    null,
+    { env: { PATH: STANDARD_PATH } },
+    { env: { PATH: STANDARD_PATH }, sandboxPolicy: { mode: 'danger-full-access', workspaceRoot: root } },
+  ]
+  let lastErr = ''
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const extra = attempts[i]
+      const spec = shell.resolve({
+        command: 'git ' + args.map(quote).join(' '),
+        workdir: cwd,
+        timeoutMs: 30000,
+        stdoutMaxBytes: 8 * 1024 * 1024,
+        ...(extra ? extra : {}),
+      })
+      const res = await shell.run(spec)
+      const out = {
+        ok: res.exitCode === 0,
+        exitCode: res.exitCode,
+        stdout: (res.stdout && res.stdout.text) || '',
+        stderr: (res.stderr && res.stderr.text) || '',
+        denied: !!(res.sandbox && res.sandbox.denied),
+        runnerFailed: !!(res.sandbox && res.sandbox.runnerFailed),
+        attempt: i + 1,
       }
+      if (out.runnerFailed) { lastErr = 'sandbox runner failed'; continue }
+      return out
+    } catch (e) {
+      lastErr = (e && e.message) ? e.message : String(e)
     }
-    return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + msg }
   }
+  return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + lastErr, attempt: 0 }
 }
 
 async function detectRepo(ctx, explicit, startHint) {

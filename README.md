@@ -21,14 +21,25 @@ DeepSeek Harness (DSH) 动态 Cordis 插件：**Git 变更摘要按钮**。
 
 - **Host 半部**（`plugin/host.js`）：通过 `harness.handle` 注册 `git-summary` RPC，用 `ctx.shell` 执行约 15 条**只读** git 命令（numstat / name-status / porcelain / log / diff --check 等），解析成摘要 JSON。
 - **Client 半部**（`plugin/client.js`）：注册在 `shell.overlay` 插槽（页面级浮层），渲染右上角按钮与面板，通过 `host.call('git-summary', …)` 取数。
-- 仓库定位：留空时从当前会话工作区向上查找最近的 git 仓库；也可以在面板输入框手动指定仓库路径。
+- 仓库定位：留空时从当前会话工作区（`useSessions` 的当前会话 `cwd`，缺失时兜底最近活跃工作区路径）向上查找最近的 git 仓库；也可以在面板输入框手动指定仓库路径。
+
+## 跨环境兼容
+
+插件不依赖宿主环境的 PATH 完整性和沙箱 runner 是否可用，执行每条 git 命令时按需自动降级：
+
+1. **默认请求** —— 宿主 PATH / 沙箱正常时直接可用（绝大多数部署）；
+2. **显式标准 PATH** —— 宿主执行环境 PATH 缺少系统目录（`bash`/`bwrap`/`git` 找不到，如 `spawn bash ENOENT`）时，注入包含 `/usr/bin:/bin` 等标准目录的 PATH 重试；
+3. **标准 PATH + 无沙箱** —— 沙箱 runner（bubblewrap `bwrap`）缺失或无法启动（如 `spawn bwrap ENOENT`）时，以 `danger-full-access` 策略重试（git 命令全部只读，安全）。
+
+面板调试区（灰色小字）会显示实际命中的级别（`attempt: 1/2/3`），便于排查。
 
 ## 安装
 
-前置条件：
+## 前置条件
 
 - DeepSeek Harness 环境（提供 `shell` / `slots` 服务与 `harness`、`React`、`host`、`styles` 等运行时能力）
-- `git` ≥ 2.23
+- `git` ≥ 2.23，位于标准系统目录（如 `/usr/bin/git`）或宿主 PATH 中
+- bubblewrap（`bwrap`）**可选**：缺失时插件自动降级为无沙箱执行，不影响功能
 
 动态 Cordis 插件不需要 npm 安装。在 DSH 会话里让 agent 用 `cordis_define` 定义即可：
 
@@ -53,6 +64,7 @@ DeepSeek Harness (DSH) 动态 Cordis 插件：**Git 变更摘要按钮**。
 | 提示“未找到 git 仓库” | 当前工作区及其父目录都不是仓库，在面板输入框填真实仓库路径 |
 | 提示“路径不是可用的 git 仓库” | 确认路径存在且已 `git init` |
 | 面板一直转圈 | 大仓库首次计算较慢（最多约 30s/命令）；点 ⟳ 重试 |
+| 调试区显示 `spawn bash ENOENT` / `spawn bwrap ENOENT` | 宿主执行环境 PATH 缺少系统目录或沙箱 runner 不可用；插件会自动降级，若仍失败请确认 `git`/`bash` 在标准目录或宿主 PATH 中 |
 | 沙箱拒绝（`denied`） | 只读 git 命令被沙箱拦截时返回错误，可放宽沙箱策略后重试 |
 
 ## 目录结构
