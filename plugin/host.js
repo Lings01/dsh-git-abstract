@@ -149,6 +149,13 @@ async function computeSummary(ctx, explicit, startHint) {
     if (/ambiguous argument 'HEAD'|unknown revision or path|HEAD does not point/i.test(errText)) {
       out.unborn = true
     } else {
+      // 附带环境探测，方便排查 spawn 类问题
+      try {
+        const p = await probeEnv(ctx)
+        debug.probe = [p.hasShell ? 'shell:y' : 'shell:n', p.hasSubprocess ? 'sub:y' : 'sub:n', p.exitCode !== null ? 'exit:' + p.exitCode : '', p.output || p.spawnErr].join(' / ')
+      } catch (e2) {
+        debug.probe = 'probe失败: ' + String(e2)
+      }
       return { ok: false, error: 'git 命令失败（rev-parse --short HEAD）: ' + errText, debug: debug }
     }
   }
@@ -263,7 +270,9 @@ async function runGit(ctx, args, cwd) {
   //   1) 默认请求 —— 宿主 PATH/沙箱正常时直接可用
   //   2) 显式标准 PATH —— 宿主 PATH 缺少系统目录（bash/bwrap/git 找不到）时
   //   3) 标准 PATH + 无沙箱 —— 沙箱 runner（bwrap）缺失或无法启动时
-  // git 命令全部只读，第 3 级无沙箱执行是安全的。
+  //   4) subprocess 直连（绝对路径 /bin/sh + 命令内 export PATH）——
+  //      以上 shell 层全部失败（如 bash 本身无法 spawn）时的最后手段
+  // git 命令全部只读，第 3/4 级无沙箱执行是安全的。
   const attempts = [
     null,
     { env: { PATH: STANDARD_PATH } },
@@ -296,7 +305,64 @@ async function runGit(ctx, args, cwd) {
       lastErr = (e && e.message) ? e.message : String(e)
     }
   }
+  const direct = await runGitDirect(ctx, args, cwd)
+  if (direct) return direct
   return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + lastErr, attempt: 0 }
+}
+
+// 第 4 级：绕过 shell 执行器，用 ctx.subprocess 直接以绝对路径 spawn /bin/sh，
+// 并在命令内部 export 标准 PATH，完全不依赖宿主环境的 bash 查找与沙箱 runner。
+async function runGitDirect(ctx, args, cwd) {
+  const sub = ctx.get('subprocess')
+  if (!sub) return null
+  try {
+    const cmd = 'export PATH="' + STANDARD_PATH + '"; exec git ' + args.map(quote).join(' ')
+    const handle = sub.spawn({
+      argv: ['/bin/sh', '-c', cmd],
+      cwd: cwd,
+      stdio: { stdin: 'ignore', stdout: { maxBytes: 8 * 1024 * 1024 }, stderr: { maxBytes: 8 * 1024 * 1024 } },
+      graceMs: 3000,
+      env: { PATH: STANDARD_PATH },
+    })
+    const outcome = await handle.done
+    let stdout = '', stderr = ''
+    try { if (handle.collected && handle.collected.stdout) stdout = handle.collected.stdout.readFrom(0).text || '' } catch (e) { stdout = '' }
+    try { if (handle.collected && handle.collected.stderr) stderr = handle.collected.stderr.readFrom(0).text || '' } catch (e) { stderr = '' }
+    return {
+      ok: outcome.exitCode === 0,
+      exitCode: outcome.exitCode,
+      stdout: stdout,
+      stderr: stderr,
+      denied: false,
+      runnerFailed: false,
+      attempt: 4,
+    }
+  } catch (e) {
+    return { ok: false, exitCode: -3, stdout: '', stderr: 'subprocess 执行失败: ' + ((e && e.message) ? e.message : String(e)), attempt: 4 }
+  }
+}
+
+// 环境探测：在失败时把插件上下文里实际的 PATH / 可执行文件解析情况返回给面板
+async function probeEnv(ctx) {
+  const out = { hasShell: !!ctx.get('shell'), hasSubprocess: !!ctx.get('subprocess'), output: '', spawnErr: '', exitCode: null }
+  const sub = ctx.get('subprocess')
+  if (sub) {
+    try {
+      const handle = sub.spawn({
+        argv: ['/bin/sh', '-c', 'printf "PATH=%s\\n" "$PATH"; echo -n "git="; command -v git || echo NOT_FOUND; echo -n "bash="; command -v bash || echo NOT_FOUND; echo -n "sh="; command -v sh || echo NOT_FOUND'],
+        cwd: '/',
+        stdio: { stdin: 'ignore', stdout: { maxBytes: 65536 }, stderr: { maxBytes: 65536 } },
+        graceMs: 3000,
+        env: { PATH: STANDARD_PATH },
+      })
+      const outcome = await handle.done
+      out.exitCode = outcome.exitCode
+      try { if (handle.collected && handle.collected.stdout) out.output = (handle.collected.stdout.readFrom(0).text || '').trim().replace(/\n/g, ' | ') } catch (e) {}
+    } catch (e) {
+      out.spawnErr = (e && e.message) ? e.message : String(e)
+    }
+  }
+  return out
 }
 
 async function detectRepo(ctx, explicit, startHint) {

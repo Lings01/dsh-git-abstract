@@ -236,6 +236,8 @@ function GitSummaryOverlay(props) {
     if (dg.repo) lines.push('repo: ' + dg.repo)
     if (dg.startHint) lines.push('start: ' + dg.startHint)
     if (dg.fallbackRoot) lines.push('fallback: ' + dg.fallbackRoot)
+    if (dg.attempt) lines.push('attempt: ' + dg.attempt)
+    if (dg.probe) lines.push('probe: ' + dg.probe)
     if (dg.branchErr) lines.push('branchErr: ' + dg.branchErr)
     if (dg.headErr) lines.push('headErr: ' + dg.headErr)
     if (lines.length) {
