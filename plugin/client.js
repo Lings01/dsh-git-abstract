@@ -1,0 +1,311 @@
+// ============================================================
+// dsh-git-abstract · Client 半部
+// ------------------------------------------------------------
+// 这是 DeepSeek Harness 动态 Cordis 插件 code.client 的函数体
+// （plain JavaScript，无 JSX/TS，直接返回 Cordis Plugin 对象）。
+//
+// 职责：
+//   - 在 shell.overlay 插槽注册右上角悬浮按钮 + 摘要面板
+//   - 通过 host.call('git-summary', …) 调用 Host 半部取数
+// ============================================================
+
+const h = React.createElement
+
+const STATUS_LABEL = { M: '改', A: '增', D: '删', R: '移', C: '拷', U: '新', T: '型' }
+const STATUS_TITLE = { M: '修改', A: '新增', D: '删除', R: '重命名', C: '复制', U: '未跟踪', T: '类型变更' }
+
+const CSS = [
+  '.gs-fab{position:relative;width:38px;height:38px;border-radius:10px;border:1px solid var(--dsw-alias-border-l1,#333);background:var(--dsw-alias-bg-overlay,#202020);color:var(--dsw-alias-label-primary,#eee);cursor:pointer;font-size:16px;line-height:1;box-shadow:0 2px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;margin-left:auto}',
+  '.gs-fab:hover{border-color:var(--dsw-alias-brand-primary,#4db6ac)}',
+  '.gs-panel{position:absolute;top:48px;right:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow-y:auto;background:var(--dsw-alias-bg-overlay,#1b1b1f);border:1px solid var(--dsw-alias-border-l1,#333);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);color:var(--dsw-alias-label-primary,#eee);font-family:system-ui,-apple-system,\'Segoe UI\',sans-serif;font-size:12px;pointer-events:auto}',
+  '.gs-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#333)}',
+  '.gs-title{font-size:13px;font-weight:600}',
+  '.gs-sub{font-size:11px;color:var(--dsw-alias-label-secondary,#999);margin-top:2px}',
+  '.gs-head-r{display:flex;gap:6px}',
+  '.gs-btn{background:var(--dsw-alias-bg-layer-1,#2a2a30);border:1px solid var(--dsw-alias-border-l1,#333);color:var(--dsw-alias-label-primary,#eee);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}',
+  '.gs-btn:hover{border-color:var(--dsw-alias-brand-primary,#4db6ac)}',
+  '.gs-btn-primary{background:var(--dsw-alias-brand-primary,#4db6ac);border-color:transparent;color:#0b0b0d;font-weight:600}',
+  '.gs-toolbar{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#333)}',
+  '.gs-input{flex:1;background:var(--dsw-alias-bg-layer-1,#2a2a30);border:1px solid var(--dsw-alias-border-l1,#333);color:var(--dsw-alias-label-primary,#eee);border-radius:8px;padding:5px 8px;font-size:12px;min-width:0}',
+  '.gs-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#4db6ac)}',
+  '.gs-body{padding:8px 12px 12px}',
+  '.gs-loading{padding:16px;text-align:center;color:var(--dsw-alias-label-secondary,#999)}',
+  '.gs-error{padding:10px 12px;border:1px solid var(--dsw-alias-state-error-primary,#ef5350);color:var(--dsw-alias-state-error-primary,#ef5350);border-radius:8px;margin:8px 0;background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#ef5350) 10%,transparent)}',
+  '.gs-meta{padding:2px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}',
+  '.gs-meta-k{color:var(--dsw-alias-label-secondary,#999);font-size:11px}',
+  '.gs-meta-sub{color:var(--dsw-alias-label-secondary,#999);font-size:11px}',
+  '.gs-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px}',
+  '.gs-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0}',
+  '.gs-cell{background:var(--dsw-alias-bg-layer-1,#2a2a30);border:1px solid var(--dsw-alias-border-l1,#333);border-radius:8px;padding:6px 4px;text-align:center}',
+  '.gs-cell-v{font-size:13px;font-weight:700}',
+  '.gs-cell-l{font-size:10px;color:var(--dsw-alias-label-secondary,#999);margin-top:2px}',
+  '.gs-sec{border:1px solid var(--dsw-alias-border-l1,#333);border-radius:8px;margin:8px 0;overflow:hidden;background:var(--dsw-alias-bg-layer-1,#2a2a30)}',
+  '.gs-sec-head{display:flex;align-items:center;gap:8px;width:100%;background:none;border:none;color:var(--dsw-alias-label-primary,#eee);padding:8px 10px;cursor:pointer;font-size:12px;text-align:left}',
+  '.gs-sec-title{font-weight:600;flex:1}',
+  '.gs-sec-badge{font-size:11px;color:var(--dsw-alias-label-secondary,#999);background:var(--dsw-alias-bg-layer-2,#36363e);border-radius:999px;padding:1px 8px}',
+  '.gs-sec-caret{color:var(--dsw-alias-label-secondary,#999)}',
+  '.gs-sec-body{padding:6px 10px 10px;border-top:1px solid var(--dsw-alias-border-l1,#333)}',
+  '.gs-frow{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px}',
+  '.gs-fpath{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}',
+  '.gs-chip{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:5px;font-size:10px;font-weight:700;padding:0 4px}',
+  '.gs-chip-M{background:var(--dsw-alias-brand-primary,#4db6ac);color:#0b0b0d}',
+  '.gs-chip-A{background:var(--dsw-alias-state-success-primary,#4caf50);color:#0b0b0d}',
+  '.gs-chip-D{background:var(--dsw-alias-state-error-primary,#ef5350);color:#fff}',
+  '.gs-chip-R{background:var(--dsw-alias-state-warn-primary,#ffb74d);color:#0b0b0d}',
+  '.gs-chip-U{background:var(--dsw-alias-label-secondary,#999);color:#0b0b0d}',
+  '.gs-chip-ext{background:var(--dsw-alias-bg-layer-2,#36363e);color:var(--dsw-alias-label-secondary,#ccc);min-width:auto}',
+  '.gs-chip-dir{background:var(--dsw-alias-bg-layer-2,#36363e);color:var(--dsw-alias-label-secondary,#ccc);min-width:auto}',
+  '.gs-delta{white-space:nowrap;font-size:11px}',
+  '.gs-add{color:var(--dsw-alias-state-success-primary,#4caf50)}',
+  '.gs-del{color:var(--dsw-alias-state-error-primary,#ef5350)}',
+  '.gs-bin{font-size:10px;color:var(--dsw-alias-label-secondary,#999)}',
+  '.gs-empty{color:var(--dsw-alias-label-secondary,#999);padding:6px 0;font-size:12px}',
+  '.gs-flist{max-height:220px;overflow-y:auto}',
+  '.gs-commit{display:flex;gap:8px;padding:2px 0;font-size:12px}',
+  '.gs-commit-hash{color:var(--dsw-alias-brand-primary,#4db6ac);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px}',
+  '.gs-commit-subject{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}',
+  '.gs-commits-sum{padding-top:6px;font-size:12px;color:var(--dsw-alias-label-secondary,#ccc)}',
+  '.gs-sec-stack{padding:4px 0}',
+  '.gs-stack-title{font-size:11px;color:var(--dsw-alias-label-secondary,#999);margin:8px 0 4px;font-weight:600}',
+  '.gs-groups{display:flex;flex-direction:column;gap:4px}',
+  '.gs-grow{display:flex;align-items:center;gap:8px;font-size:12px}',
+  '.gs-gnum{font-size:11px;color:var(--dsw-alias-label-secondary,#ccc)}',
+  '.gs-extras{display:flex;flex-direction:column;gap:6px}',
+  '.gs-extra-row{display:flex;justify-content:space-between;align-items:center;font-size:12px}',
+  '.gs-untracked{max-height:120px;overflow-y:auto;color:var(--dsw-alias-label-secondary,#ccc)}',
+  '.gs-check-issues{margin-top:4px;max-height:100px;overflow-y:auto;background:var(--dsw-alias-bg-layer-2,#36363e);border-radius:6px;padding:6px 8px}',
+  '.gs-warn{color:var(--dsw-alias-state-warn-primary,#ffb74d)}',
+  '.gs-time{padding-top:8px;text-align:right;font-size:10px;color:var(--dsw-alias-label-secondary,#777)}',
+].join('\n')
+
+function list(items, fn) {
+  const out = []
+  for (let i = 0; i < items.length; i++) out.push(fn(items[i], i))
+  return out
+}
+
+function fmt(n) {
+  return String(n)
+}
+
+function fmtDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso
+  return d.toLocaleString()
+}
+
+function StatCell(props) {
+  return h('div', { className: 'gs-cell' },
+    h('div', { className: 'gs-cell-v', style: { color: props.color } }, props.value),
+    h('div', { className: 'gs-cell-l' }, props.label))
+}
+
+function Section(props) {
+  const [collapsed, setCollapsed] = React.useState(false)
+  return h('div', { className: 'gs-sec' },
+    h('button', { className: 'gs-sec-head', onClick: function () { setCollapsed(!collapsed) } },
+      h('span', { className: 'gs-sec-title' }, props.title),
+      props.badge ? h('span', { className: 'gs-sec-badge' }, props.badge) : null,
+      h('span', { className: 'gs-sec-caret' }, collapsed ? '▸' : '▾')),
+    collapsed ? null : h('div', { className: 'gs-sec-body' }, props.children))
+}
+
+function StatusChip(props) {
+  const s = props.status || 'M'
+  return h('span', { className: 'gs-chip gs-chip-' + s, title: STATUS_TITLE[s] || s }, STATUS_LABEL[s] || s)
+}
+
+function Delta(props) {
+  if (props.binary) return h('span', { className: 'gs-bin' }, '二进制')
+  return h('span', { className: 'gs-delta' },
+    h('span', { className: 'gs-add' }, '+' + fmt(props.added)),
+    ' ',
+    h('span', { className: 'gs-del' }, '-' + fmt(props.deleted)))
+}
+
+function FileRow(props) {
+  const f = props.f
+  const name = f.from ? f.from + ' → ' + f.path : f.path
+  return h('div', { className: 'gs-frow' },
+    h(StatusChip, { status: f.status }),
+    h('span', { className: 'gs-fpath', title: name }, name),
+    h(Delta, { added: f.added, deleted: f.deleted, binary: f.binary }))
+}
+
+function FileList(props) {
+  const files = props.files || []
+  if (files.length === 0) return h('div', { className: 'gs-empty' }, '无变更')
+  return h('div', { className: 'gs-flist' }, list(files, function (f, i) {
+    return h(FileRow, { key: i, f: f })
+  }))
+}
+
+function StatBadge(props) {
+  const s = props.stats
+  return h('span', { className: 'gs-sec-badge' },
+    fmt(s.files) + ' 文件 · ',
+    h('span', { className: 'gs-add' }, '+' + fmt(s.added)), ' ',
+    h('span', { className: 'gs-del' }, '-' + fmt(s.deleted)))
+}
+
+function CommitRow(props) {
+  const c = props.c
+  return h('div', { className: 'gs-commit' },
+    h('span', { className: 'gs-commit-hash' }, c.short),
+    h('span', { className: 'gs-commit-subject' }, c.subject || ''))
+}
+
+function GroupRow(props) {
+  const g = props.g
+  const kind = props.kind
+  return h('div', { className: 'gs-grow' },
+    h('span', { className: 'gs-chip ' + (kind === 'ext' ? 'gs-chip-ext' : 'gs-chip-dir') }, g.key),
+    h('span', { className: 'gs-gnum' }, fmt(g.files) + ' 文件 ',
+      h('span', { className: 'gs-add' }, '+' + fmt(g.added)), ' ',
+      h('span', { className: 'gs-del' }, '-' + fmt(g.deleted))))
+}
+
+function GitSummaryOverlay() {
+  const [open, setOpen] = React.useState(false)
+  const [data, setData] = React.useState(null)
+  const [loading, setLoading] = React.useState(false)
+  const [error, setError] = React.useState(null)
+  const [repoInput, setRepoInput] = React.useState('')
+
+  const load = function (repo) {
+    setLoading(true)
+    setError(null)
+    host.call('git-summary', repo && repo.trim() ? { repo: repo.trim() } : {}).then(function (res) {
+      setData(res)
+      if (!res || res.ok !== true) setError((res && res.error) || '获取失败')
+      setLoading(false)
+    }, function (err) {
+      setError('调用失败: ' + String((err && err.message) || err))
+      setLoading(false)
+    })
+  }
+
+  React.useEffect(function () {
+    if (open && !data && !loading) load(repoInput)
+  }, [open])
+
+  const rootStyle = { position: 'fixed', top: '12px', right: '16px', zIndex: 2147483000, pointerEvents: 'auto' }
+  const fab = h('button', { className: 'gs-fab', title: 'Git 变更摘要', onClick: function () { setOpen(!open) } },
+    h('span', { className: 'gs-fab-icon' }, '⑂'))
+
+  if (!open) return h('div', { style: rootStyle }, fab)
+
+  const header = h('div', { className: 'gs-head' },
+    h('div', { className: 'gs-head-l' },
+      h('div', { className: 'gs-title' }, 'Git 变更摘要'),
+      h('div', { className: 'gs-sub' }, data && data.ok ? (data.branch || '—') + ' @ ' + ((data.head && data.head.short) || '—') : '加载中…')),
+    h('div', { className: 'gs-head-r' },
+      h('button', { className: 'gs-btn', title: '刷新', onClick: function () { load(repoInput) } }, '⟳'),
+      h('button', { className: 'gs-btn', title: '关闭', onClick: function () { setOpen(false) } }, '✕')))
+
+  const toolbar = h('div', { className: 'gs-toolbar' },
+    h('input', { className: 'gs-input', placeholder: '仓库路径（留空自动检测）', value: repoInput,
+      onChange: function (e) { setRepoInput(e.target.value) },
+      onKeyDown: function (e) { if (e.key === 'Enter') load(repoInput) } }),
+    h('button', { className: 'gs-btn gs-btn-primary', onClick: function () { load(repoInput) } }, '应用'))
+
+  const content = []
+  if (loading) content.push(h('div', { key: 'loading', className: 'gs-loading' }, '正在计算变更摘要…'))
+  if (error) content.push(h('div', { key: 'error', className: 'gs-error' }, error))
+
+  if (data && data.ok) {
+    const d = data
+    const un = d.uncommitted
+
+    const headLine = d.head ? h('div', { className: 'gs-meta' },
+      h('span', { className: 'gs-meta-k' }, 'HEAD'), ' ',
+      h('span', { className: 'gs-mono' }, d.head.short), ' ',
+      h('span', { className: 'gs-meta-sub' }, d.head.subject || ''),
+      h('div', { className: 'gs-meta-sub' }, (d.head.author || '') + (d.head.date ? ' · ' + fmtDate(d.head.date) : ''))) : null
+
+    const repoLine = h('div', { className: 'gs-meta' },
+      h('span', { className: 'gs-meta-k' }, '仓库'), ' ',
+      h('span', { className: 'gs-mono' }, d.repo || ''))
+
+    const baseLine = h('div', { className: 'gs-meta' },
+      h('span', { className: 'gs-meta-k' }, '基分支'), ' ',
+      h('span', { className: 'gs-mono' }, d.base || '—'),
+      d.upstream ? h('span', { className: 'gs-meta-sub' }, '  upstream ' + d.upstream + (d.ahead || d.behind ? ' · +' + d.ahead + ' / -' + d.behind : '')) : null)
+
+    const overview = h('div', { className: 'gs-cards' },
+      h(StatCell, { label: '文件数', value: un ? fmt(un.stats.files) : '—' }),
+      h(StatCell, { label: '新增行', value: un ? '+' + fmt(un.stats.added) : '—', color: 'var(--dsw-alias-state-success-primary, #4caf50)' }),
+      h(StatCell, { label: '删除行', value: un ? '-' + fmt(un.stats.deleted) : '—', color: 'var(--dsw-alias-state-error-primary, #ef5350)' }),
+      h(StatCell, { label: '净变化', value: un ? fmt(un.stats.net >= 0 ? '+' + un.stats.net : un.stats.net) : '—' }),
+      h(StatCell, { label: '未跟踪', value: d.untracked ? fmt(d.untracked.length) : '—' }))
+
+    content.push(h('div', { key: 'meta' }, repoLine, baseLine, headLine, overview))
+
+    if (d.unborn) {
+      content.push(h('div', { key: 'unborn', className: 'gs-empty' }, '仓库还没有提交（unborn branch），仅显示未跟踪文件。'))
+    } else {
+      const secs = []
+      secs.push(h(Section, { key: 'un', title: '未提交变更（相对 HEAD）', badge: h(StatBadge, { stats: un.stats }), children: h(FileList, { files: un.files }) }))
+      secs.push(h(Section, { key: 'st', title: '已暂存 (staged)', badge: h(StatBadge, { stats: d.staged.stats }), children: h(FileList, { files: d.staged.files }) }))
+      secs.push(h(Section, { key: 'us', title: '未暂存 (unstaged)', badge: h(StatBadge, { stats: d.unstaged.stats }), children: h(FileList, { files: d.unstaged.files }) }))
+
+      if (d.branchCommits) {
+        const commitEls = list(d.branchCommits.list, function (c, i) { return h(CommitRow, { key: i, c: c }) })
+        if (d.branchDiff) {
+          commitEls.push(h('div', { key: 'sum', className: 'gs-commits-sum' }, '合并差异: ' + fmt(d.branchDiff.stats.files) + ' 文件 ',
+            h('span', { className: 'gs-add' }, '+' + fmt(d.branchDiff.stats.added)), ' ',
+            h('span', { className: 'gs-del' }, '-' + fmt(d.branchDiff.stats.deleted))))
+        }
+        secs.push(h(Section, { key: 'bc', title: '分支提交（领先 ' + d.base + '）', badge: fmt(d.branchCommits.count) + ' 条', children: h('div', { className: 'gs-commits' }, commitEls) }))
+      }
+
+      const fileChildren = []
+      if (d.topFiles && d.topFiles.length) {
+        fileChildren.push(h('div', { key: 'top-t', className: 'gs-stack-title' }, '变更最多 TOP ' + d.topFiles.length))
+        fileChildren.push(h(FileList, { key: 'top', files: d.topFiles }))
+      }
+      if (d.groups) {
+        fileChildren.push(h('div', { key: 'ext-t', className: 'gs-stack-title' }, '按扩展名'))
+        fileChildren.push(h('div', { key: 'ext', className: 'gs-groups' }, list(d.groups.byExt.slice(0, 12), function (g, i) { return h(GroupRow, { key: i, g: g, kind: 'ext' }) })))
+        fileChildren.push(h('div', { key: 'dir-t', className: 'gs-stack-title' }, '按顶层目录'))
+        fileChildren.push(h('div', { key: 'dir', className: 'gs-groups' }, list(d.groups.byDir.slice(0, 12), function (g, i) { return h(GroupRow, { key: i, g: g, kind: 'dir' }) })))
+      }
+      secs.push(h(Section, { key: 'files', title: '文件明细（按变更量排序）', badge: un ? fmt(un.files.length) : '0', children: h('div', { className: 'gs-sec-stack' }, fileChildren) }))
+
+      const extras = []
+      extras.push(h('div', { key: 'ut', className: 'gs-extra-row' }, h('span', {}, '未跟踪文件'), h('span', { className: 'gs-mono' }, fmt(d.untracked.length))))
+      if (d.untracked && d.untracked.length) {
+        extras.push(h('div', { key: 'utl', className: 'gs-untracked' }, list(d.untracked.slice(0, 10), function (p, i) { return h('div', { key: i, className: 'gs-mono' }, p) })))
+      }
+      extras.push(h('div', { key: 'bin', className: 'gs-extra-row' }, h('span', {}, '二进制文件'), h('span', { className: 'gs-mono' }, fmt(un.stats.binaries))))
+      extras.push(h('div', { key: 'cf', className: 'gs-extra-row' }, h('span', {}, '冲突标记'), h('span', { className: 'gs-mono', style: { color: d.check && d.check.conflicts ? 'var(--dsw-alias-state-warn-primary, #ffb74d)' : undefined } }, fmt(d.check ? d.check.conflicts : 0))))
+      extras.push(h('div', { key: 'ws', className: 'gs-extra-row' }, h('span', {}, '空白错误'), h('span', { className: 'gs-mono' }, fmt(d.check ? d.check.whitespace : 0))))
+      if (d.check && d.check.issues && d.check.issues.length) {
+        extras.push(h('div', { key: 'ci', className: 'gs-check-issues' }, list(d.check.issues, function (l, i) { return h('div', { key: i, className: 'gs-mono gs-warn' }, l) })))
+      }
+      secs.push(h(Section, { key: 'extras', title: '附加检查', children: h('div', { className: 'gs-extras' }, extras) }))
+
+      secs.push(h(Section, { key: 'recent', title: '最近 5 条提交', children: h('div', { className: 'gs-commits' }, list(d.recent, function (c, i) { return h(CommitRow, { key: i, c: c }) })) }))
+      content.push(h('div', { key: 'secs', className: 'gs-secs' }, secs))
+    }
+
+    content.push(h('div', { key: 'time', className: 'gs-time' }, '生成于 ' + fmtDate(d.generatedAt)))
+  }
+
+  return h('div', { style: rootStyle }, fab, h('div', { className: 'gs-panel' }, header, toolbar, h('div', { className: 'gs-body' }, content)))
+}
+
+return {
+  apply(ctx) {
+    ctx.effect(function () { return styles.insert(CSS) })
+    const slots = ctx.get('slots')
+    if (slots === undefined) return
+    slots.inject('shell.overlay', function () {
+      return slots.register(
+        { name: 'shell.overlay', id: 'git-summary' },
+        function () { return h(GitSummaryOverlay, null) },
+      )
+    })
+  },
+}
