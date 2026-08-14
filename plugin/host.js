@@ -112,10 +112,14 @@ return {
 }
 
 async function computeSummary(ctx, explicit, startHint) {
-  const root = await detectRepo(ctx, explicit, startHint)
-  if (root === null) return { ok: false, error: '未找到 git 仓库（已尝试会话工作区及其父目录），可在面板里输入仓库路径' }
-  if (root.error) return { ok: false, error: root.error }
+  const sp = ctx.get('sandboxPolicy')
+  const fallbackRoot = (sp && sp.workspaceRoot) || ''
+  const debug = { startHint: startHint || '', fallbackRoot: fallbackRoot, repo: '', branchErr: '', headErr: '' }
+  const root = await detectRepo(ctx, explicit, startHint || fallbackRoot)
+  if (root === null) return { ok: false, error: '未找到 git 仓库（已尝试会话工作区及其父目录），可在面板里输入仓库路径', debug: debug }
+  if (root.error) return { ok: false, error: root.error, debug: debug }
   const repo = root
+  debug.repo = repo
 
   const out = {
     ok: true,
@@ -129,10 +133,20 @@ async function computeSummary(ctx, explicit, startHint) {
 
   const branchR = await runGit(ctx, ['rev-parse', '--abbrev-ref', 'HEAD'], repo)
   const branch = branchR.ok ? branchR.stdout : null
+  if (!branchR.ok && branchR.stderr) debug.branchErr = branchR.stderr
   out.branch = branch === 'HEAD' ? '(detached HEAD)' : (branch || null)
 
   const headR = await runGit(ctx, ['rev-parse', '--short', 'HEAD'], repo)
-  if (!headR.ok) out.unborn = true
+  if (!headR.ok) {
+    const errText = headR.stderr || ('exit ' + headR.exitCode)
+    debug.headErr = errText
+    // 只有确认真的是“还没有任何提交”才算 unborn，否则把真实错误返回给面板
+    if (/ambiguous argument 'HEAD'|unknown revision or path|HEAD does not point/i.test(errText)) {
+      out.unborn = true
+    } else {
+      return { ok: false, error: 'git 命令失败（rev-parse --short HEAD）: ' + errText, debug: debug }
+    }
+  }
 
   const logR = await runGit(ctx, ['log', '-1', '--format=%h%x1f%s%x1f%an%x1f%aI'], repo)
   if (logR.ok && logR.stdout) {
@@ -219,6 +233,7 @@ async function computeSummary(ctx, explicit, startHint) {
       .slice(0, 5)
   }
 
+  out.debug = debug
   return out
 }
 

@@ -24,13 +24,14 @@ const CSS = [
   '.gs-head-r{display:flex;gap:6px}',
   '.gs-btn{background:var(--dsw-alias-bg-layer-1,#2a2a30);border:1px solid var(--dsw-alias-border-l1,#333);color:var(--dsw-alias-label-primary,#eee);border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer}',
   '.gs-btn:hover{border-color:var(--dsw-alias-brand-primary,#4db6ac)}',
-  '.gs-btn-primary{background:var(--dsw-alias-brand-primary,#4db6ac);border-color:transparent;color:#0b0b0d;font-weight:600}',
+  '.gs-btn-primary{background:#14b8a6;border-color:transparent;color:#04231f;font-weight:600}',
   '.gs-toolbar{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,#333)}',
   '.gs-input{flex:1;background:var(--dsw-alias-bg-layer-1,#2a2a30);border:1px solid var(--dsw-alias-border-l1,#333);color:var(--dsw-alias-label-primary,#eee);border-radius:8px;padding:5px 8px;font-size:12px;min-width:0}',
   '.gs-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary,#4db6ac)}',
   '.gs-body{padding:8px 12px 12px}',
   '.gs-loading{padding:16px;text-align:center;color:var(--dsw-alias-label-secondary,#999)}',
   '.gs-error{padding:10px 12px;border:1px solid var(--dsw-alias-state-error-primary,#ef5350);color:var(--dsw-alias-state-error-primary,#ef5350);border-radius:8px;margin:8px 0;background:color-mix(in srgb,var(--dsw-alias-state-error-primary,#ef5350) 10%,transparent)}',
+  '.gs-debug{margin:6px 0;padding:6px 8px;background:var(--dsw-alias-bg-layer-2,#36363e);border-radius:6px;color:var(--dsw-alias-label-secondary,#ccc);font-size:10px;overflow-x:auto}',
   '.gs-meta{padding:2px 0;font-size:12px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}',
   '.gs-meta-k{color:var(--dsw-alias-label-secondary,#999);font-size:11px}',
   '.gs-meta-sub{color:var(--dsw-alias-label-secondary,#999);font-size:11px}',
@@ -176,9 +177,17 @@ function GitSummaryOverlay(props) {
   // 会话列表：current 是当前会话 id，byId[current].cwd 即当前工作区路径，
   // 作为仓库自动探测的起点（Host 端无法可靠拿到会话 cwd）。
   const sessions = props && props.useSessions ? props.useSessions(function (s) { return s }) : null
-  const autoCwd = sessions && sessions.current && sessions.byId && sessions.byId[sessions.current]
+  let autoCwd = sessions && sessions.current && sessions.byId && sessions.byId[sessions.current]
     ? sessions.byId[sessions.current].cwd || ''
     : ''
+  // 兜底：会话 cwd 缺失时用最近活跃工作区的路径
+  if (!autoCwd && props && props.useWorkspaces) {
+    const workspaces = props.useWorkspaces(function (s) { return s })
+    if (workspaces && workspaces.items && workspaces.recentWorkspaceId) {
+      const w = workspaces.items.find(function (x) { return x.workspaceId === workspaces.recentWorkspaceId })
+      if (w && w.path) autoCwd = w.path
+    }
+  }
 
   const load = function (repo) {
     setLoading(true)
@@ -221,6 +230,18 @@ function GitSummaryOverlay(props) {
   const content = []
   if (loading) content.push(h('div', { key: 'loading', className: 'gs-loading' }, '正在计算变更摘要…'))
   if (error) content.push(h('div', { key: 'error', className: 'gs-error' }, error))
+  if (data && data.debug) {
+    const dg = data.debug
+    const lines = []
+    if (dg.repo) lines.push('repo: ' + dg.repo)
+    if (dg.startHint) lines.push('start: ' + dg.startHint)
+    if (dg.fallbackRoot) lines.push('fallback: ' + dg.fallbackRoot)
+    if (dg.branchErr) lines.push('branchErr: ' + dg.branchErr)
+    if (dg.headErr) lines.push('headErr: ' + dg.headErr)
+    if (lines.length) {
+      content.push(h('div', { key: 'debug', className: 'gs-debug' }, list(lines, function (l, i) { return h('div', { key: i, className: 'gs-mono' }, l) })))
+    }
+  }
 
   if (data && data.ok) {
     const d = data
