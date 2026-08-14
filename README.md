@@ -7,6 +7,12 @@ A button (⑂) beside the "Session log" in the session header opens a panel show
 > Works in the DeepSeek Harness Web GUI: one click shows the full picture of the git repo your current workspace lives in.
 
 > **中文文档见 [README.zh.md](README.zh.md)** / Chinese docs: [README.zh.md](README.zh.md).
+[![Stars](https://img.shields.io/github/stars/Lings01/dsh-git-abstract?style=flat-square&label=Stars)](https://github.com/Lings01/dsh-git-abstract/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/Lings01/dsh-git-abstract/total?style=flat-square&label=Downloads)](https://github.com/Lings01/dsh-git-abstract/releases)
+[![License](https://img.shields.io/github/license/Lings01/dsh-git-abstract?style=flat-square)](https://github.com/Lings01/dsh-git-abstract/blob/main/LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/Lings01/dsh-git-abstract?style=flat-square&label=Last%20commit)](https://github.com/Lings01/dsh-git-abstract/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/Lings01/dsh-git-abstract?style=flat-square&label=Repo%20size)](https://github.com/Lings01/dsh-git-abstract)
+
 
 ## Features
 

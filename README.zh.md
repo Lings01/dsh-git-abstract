@@ -7,6 +7,12 @@ DeepSeek Harness (DSH) 的**动态 Cordis 插件**：Git 变更摘要按钮。
 > 适用于 DeepSeek Harness Web GUI：点一下按钮，就能看到当前工作区所在 git 仓库的变更全貌。
 
 > **English: [README.md](README.md)**
+[![Stars](https://img.shields.io/github/stars/Lings01/dsh-git-abstract?style=flat-square&label=Stars)](https://github.com/Lings01/dsh-git-abstract/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/Lings01/dsh-git-abstract/total?style=flat-square&label=Downloads)](https://github.com/Lings01/dsh-git-abstract/releases)
+[![License](https://img.shields.io/github/license/Lings01/dsh-git-abstract?style=flat-square)](https://github.com/Lings01/dsh-git-abstract/blob/main/LICENSE)
+[![Last commit](https://img.shields.io/github/last-commit/Lings01/dsh-git-abstract?style=flat-square&label=Last%20commit)](https://github.com/Lings01/dsh-git-abstract/commits/main)
+[![Repo size](https://img.shields.io/github/repo-size/Lings01/dsh-git-abstract?style=flat-square&label=Repo%20size)](https://github.com/Lings01/dsh-git-abstract)
+
 
 ## 特性
 
