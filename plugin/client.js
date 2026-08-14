@@ -16,8 +16,8 @@ const STATUS_TITLE = { M: '修改', A: '新增', D: '删除', R: '重命名', C:
 
 const CSS = [
   ".gs-entry{display:inline-flex;align-items:center}",
-  ".gs-fab{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));background:transparent;color:var(--dsw-alias-label-secondary,#cfd3d6);cursor:pointer;font-size:14px;line-height:1;transition:background .15s,color .15s,border-color .15s}",
-  ".gs-fab:hover{background:var(--dsw-alias-bg-layer-1,#232324);border-color:var(--dsw-alias-border-l2,rgba(255,255,255,.12));color:var(--dsw-alias-label-primary,#f9fafb)}",
+  ".gs-fab{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;border:1px solid #6366f1;background:#4338ca;color:#fff;cursor:pointer;font-size:15px;line-height:1;box-shadow:0 1px 8px rgba(67,56,202,.55);transition:background .15s,border-color .15s,box-shadow .15s}",
+  ".gs-fab:hover{background:#4f46e5;border-color:#818cf8;box-shadow:0 1px 10px rgba(79,70,229,.6)}",
   ".gs-panel{position:fixed;top:48px;right:16px;z-index:2147483000;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow-y:auto;background:var(--dsw-alias-bg-overlay,#1b1b1f);border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);color:var(--dsw-alias-label-primary,#f9fafb);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;pointer-events:auto}",
   ".gs-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06))}",
   ".gs-title{font-size:13px;font-weight:600}",
