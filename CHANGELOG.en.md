@@ -32,7 +32,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 ## [0.1.0] - 2026-08-14
 
 ### Added
-- Floating button (⑂) and summary panel at the top-right (registered in the `shell.overlay` slot)
+- Button (⑂) beside "Session log" in the session header and summary panel (registered in the `conversation.session.header.utilities` slot)
 - Host-side `git-summary` RPC: ~15 read-only git commands with parsing
 - Summary content: overview cards, meta info, uncommitted/staged/unstaged, branch commits, file details (TOP5 / by extension / by directory), extra checks (untracked / binary / conflict markers / whitespace errors / recent commits)
 - Automatic repo detection (walk up from workspace) and manual path input

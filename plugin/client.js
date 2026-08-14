@@ -15,9 +15,10 @@ const STATUS_LABEL = { M: '改', A: '增', D: '删', R: '移', C: '拷', U: '新
 const STATUS_TITLE = { M: '修改', A: '新增', D: '删除', R: '重命名', C: '复制', U: '未跟踪', T: '类型变更' }
 
 const CSS = [
-  ".gs-fab{position:relative;width:32px;height:32px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));background:transparent;color:var(--dsw-alias-label-secondary,#cfd3d6);cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;margin-left:auto;transition:background .15s,color .15s,border-color .15s}",
+  ".gs-entry{display:inline-flex;align-items:center}",
+  ".gs-fab{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));background:transparent;color:var(--dsw-alias-label-secondary,#cfd3d6);cursor:pointer;font-size:14px;line-height:1;transition:background .15s,color .15s,border-color .15s}",
   ".gs-fab:hover{background:var(--dsw-alias-bg-layer-1,#232324);border-color:var(--dsw-alias-border-l2,rgba(255,255,255,.12));color:var(--dsw-alias-label-primary,#f9fafb)}",
-  ".gs-panel{position:absolute;top:48px;right:0;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow-y:auto;background:var(--dsw-alias-bg-overlay,#1b1b1f);border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);color:var(--dsw-alias-label-primary,#f9fafb);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;pointer-events:auto}",
+  ".gs-panel{position:fixed;top:48px;right:16px;z-index:2147483000;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow-y:auto;background:var(--dsw-alias-bg-overlay,#1b1b1f);border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);color:var(--dsw-alias-label-primary,#f9fafb);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;pointer-events:auto}",
   ".gs-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06))}",
   ".gs-title{font-size:13px;font-weight:600}",
   ".gs-sub{font-size:11px;color:var(--dsw-alias-label-secondary,#cfd3d6);margin-top:2px}",
@@ -215,11 +216,10 @@ function GitSummaryOverlay(props) {
     if (open) load(repoInput)
   }, [autoCwd])
 
-  const rootStyle = { position: 'fixed', top: '12px', right: '16px', zIndex: 2147483000, pointerEvents: 'auto' }
   const fab = h('button', { className: 'gs-fab', title: 'Git 变更摘要', onClick: function () { setOpen(!open) } },
     h('span', { className: 'gs-fab-icon' }, '⑂'))
 
-  if (!open) return h('div', { style: rootStyle }, fab)
+  if (!open) return h('div', { className: 'gs-entry' }, fab)
 
   const header = h('div', { className: 'gs-head' },
     h('div', { className: 'gs-head-l' },
@@ -333,7 +333,7 @@ function GitSummaryOverlay(props) {
     content.push(h('div', { key: 'time', className: 'gs-time' }, '生成于 ' + fmtDate(d.generatedAt)))
   }
 
-  return h('div', { style: rootStyle }, fab, h('div', { className: 'gs-panel' }, header, toolbar, h('div', { className: 'gs-body' }, content)))
+  return h('div', { className: 'gs-entry' }, fab, h('div', { className: 'gs-panel' }, header, toolbar, h('div', { className: 'gs-body' }, content)))
 }
 
 return {
@@ -341,9 +341,9 @@ return {
     ctx.effect(function () { return styles.insert(CSS) })
     const slots = ctx.get('slots')
     if (slots === undefined) return
-    slots.inject('shell.overlay', function () {
+    slots.inject('conversation.session.header.utilities', function () {
       return slots.register(
-        { name: 'shell.overlay', id: 'git-summary' },
+        { name: 'conversation.session.header.utilities', id: 'git-summary', order: 30 },
         function (props) { return h(GitSummaryOverlay, props) },
       )
     })

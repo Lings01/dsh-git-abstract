@@ -2,7 +2,7 @@
 
 A **dynamic Cordis plugin** for DeepSeek Harness (DSH): a Git change summary button.
 
-A floating button (⑂) at the top-right of the page opens a panel showing a concise summary of the current git branch's changes — added/deleted lines, affected files, commits, conflict checks — with styling that matches the DSH theme.
+A button (⑂) beside the "Session log" in the session header opens a panel showing a concise summary of the current git branch's changes — added/deleted lines, affected files, commits, conflict checks — with styling that matches the DSH theme.
 
 > Works in the DeepSeek Harness Web GUI: one click shows the full picture of the git repo your current workspace lives in.
 
@@ -25,7 +25,7 @@ A floating button (⑂) at the top-right of the page opens a panel showing a con
 1. Get the code: `git clone https://github.com/Lings01/dsh-git-abstract.git` (or just copy the two files under `plugin/`)
 2. In a DSH session, ask the agent to define the plugin with `cordis_define` (`code.host` from `plugin/host.js`, `code.client` from `plugin/client.js`)
 3. Activate with `cordis_run` (browser approval required on first activation)
-4. Click the ⑂ button at the top-right to view the current repo's change summary
+4. Click the ⑂ button next to "Session log" in the session header to view the current repo's change summary
 
 Full steps: **[Installation](docs/INSTALL.en.md)** · every panel section explained in **[Usage](docs/USAGE.en.md)**.
 
