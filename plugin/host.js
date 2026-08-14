@@ -252,12 +252,13 @@ function buildSection(nsR, nsrR) {
 async function runGit(ctx, args, cwd) {
   const shell = ctx.get('shell')
   if (!shell) return { ok: false, exitCode: -1, stdout: '', stderr: 'shell 服务不可用' }
-  try {
+  const attempt = async function (policy) {
     const spec = shell.resolve({
       command: 'git ' + args.map(quote).join(' '),
       workdir: cwd,
       timeoutMs: 30000,
       stdoutMaxBytes: 8 * 1024 * 1024,
+      ...(policy ? { sandboxPolicy: policy } : {}),
     })
     const res = await shell.run(spec)
     return {
@@ -266,9 +267,29 @@ async function runGit(ctx, args, cwd) {
       stdout: (res.stdout && res.stdout.text) || '',
       stderr: (res.stderr && res.stderr.text) || '',
       denied: !!(res.sandbox && res.sandbox.denied),
+      runnerFailed: !!(res.sandbox && res.sandbox.runnerFailed),
     }
+  }
+  const unsandboxed = async function () {
+    const sp = ctx.get('sandboxPolicy')
+    const root = (sp && sp.workspaceRoot) || '/'
+    return attempt({ mode: 'danger-full-access', workspaceRoot: root })
+  }
+  try {
+    const r = await attempt(null)
+    if (!r.runnerFailed) return r
+    // 沙箱 runner 不可用（如 bwrap 缺失/无法启动）→ 降级为无沙箱重试（git 只读命令）
+    return await unsandboxed()
   } catch (e) {
-    return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + (e && e.message ? e.message : String(e)) }
+    const msg = (e && e.message) ? e.message : String(e)
+    if (/spawn .* ENOENT|SandboxUnavailable|runner/i.test(msg)) {
+      try {
+        return await unsandboxed()
+      } catch (e2) {
+        return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + ((e2 && e2.message) ? e2.message : String(e2)) }
+      }
+    }
+    return { ok: false, exitCode: -2, stdout: '', stderr: 'shell 执行失败: ' + msg }
   }
 }
 
