@@ -1,82 +1,74 @@
 # dsh-git-abstract
 
-DeepSeek Harness (DSH) 动态 Cordis 插件：**Git 变更摘要按钮**。
+DeepSeek Harness (DSH) 的**动态 Cordis 插件**：Git 变更摘要按钮。
 
-页面右上角一个悬浮按钮（⑂），点击弹出当前 git 仓库分支的变更摘要面板——包含 +/- 行数、涉及文件、提交列表、冲突检查等一屏信息。
+页面右上角一个悬浮按钮（⑂），点击弹出当前 git 仓库分支的变更摘要面板——+/- 行数、涉及文件、提交列表、冲突检查等一屏信息，配色与 DSH 主题一致。
 
-> 在 DeepSeek Harness Web GUI 中点击右上角按钮即可查看你正在开发仓库的变更总览。
+> 适用于 DeepSeek Harness Web GUI：点一下按钮，就能看到当前工作区所在 git 仓库的变更全貌。
 
-## 功能
+> **English docs: [README.en.md](README.en.md)**
+
+## 特性
 
 - **概览卡片**：文件数 / +新增行 / −删除行 / 净变化 / 未跟踪文件数
 - **元信息**：仓库路径、当前分支、upstream 及 ahead/behind、自动探测的基分支、HEAD 提交（短 hash + 提交信息 + 作者 + 时间）
-- **未提交变更**：分三组——相对 HEAD 的总变更、已暂存 (staged)、未暂存 (unstaged)，每个文件带状态徽标（改/增/删/移）和 `+x −y` 行数
+- **未提交变更**：分三组——相对 HEAD 的总变更、已暂存 (staged)、未暂存 (unstaged)，每个文件带状态徽标（改/增/删/移/新）和 `+x −y` 行数
 - **分支提交**：领先基分支的提交列表 + 合并差异统计（基分支按 `upstream → origin/<分支> → origin/main → origin/master → main → master → develop` 自动探测）
-- **文件明细**：完整文件表（按变更量排序）、变更最多 TOP5、按扩展名分组、按顶层目录分组
-- **附加检查**：未跟踪文件清单、二进制文件数、冲突标记数（`<<<<<<<` 黄色告警）、空白错误、最近 5 条提交、生成时间
+- **文件明细**：按变更量排序的完整文件表、变更最多 TOP5、按扩展名分组、按顶层目录分组
+- **附加检查**：未跟踪文件清单、二进制文件数、冲突标记数（`<<<<<<<` 琥珀色告警）、空白错误、最近 5 条提交、生成时间
+- **仓库自动定位**：从当前会话工作区向上查找最近的 git 仓库；**切换工作区自动刷新**
+- **跨环境自适应**：不依赖宿主 PATH 完整性和沙箱 runner，四级降级自动执行（详见 [安装教程 → 跨环境兼容](docs/INSTALL.md#跨环境兼容)）
+- **DSH 主题一致**：使用 DSH 主题 token（浅色/深色自动适配），语义色跟随 DSH 状态色
 
-所有区块可折叠，配色跟随页面主题（浅色/深色自适应）。
+## 快速开始
+
+1. 获取代码：`git clone https://github.com/Lings01/dsh-git-abstract.git`（或直接复制 `plugin/` 下两个文件）
+2. 在 DSH 会话中让 agent 用 `cordis_define` 定义插件（`code.host` 用 `plugin/host.js`，`code.client` 用 `plugin/client.js`）
+3. `cordis_run` 激活（首次需在浏览器端授权）
+4. 页面右上角出现 ⑂ 按钮，点击查看当前仓库变更摘要
+
+详细步骤见 **[安装教程](docs/INSTALL.md)**，面板每个区块的说明见 **[使用教程](docs/USAGE.md)**。
+
+## 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [docs/INSTALL.md](docs/INSTALL.md) / [INSTALL.en.md](docs/INSTALL.en.md) | 安装教程（中/英）：前置条件、定义/激活/更新/停止插件的完整步骤、跨环境兼容说明 |
+| [docs/USAGE.md](docs/USAGE.md) / [USAGE.en.md](docs/USAGE.en.md) | 使用教程（中/英）：面板详解、仓库定位、手动路径、状态徽标图例、常见操作 |
+| [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.en.md](CHANGELOG.en.md) | 版本历史（中/英） |
 
 ## 工作原理
 
-- **Host 半部**（`plugin/host.js`）：通过 `harness.handle` 注册 `git-summary` RPC，用 `ctx.shell` 执行约 15 条**只读** git 命令（numstat / name-status / porcelain / log / diff --check 等），解析成摘要 JSON。
+- **Host 半部**（`plugin/host.js`）：通过 `harness.handle` 注册 `git-summary` RPC，执行约 15 条**只读** git 命令（numstat / name-status / porcelain / log / diff --check 等）并解析成摘要 JSON。
 - **Client 半部**（`plugin/client.js`）：注册在 `shell.overlay` 插槽（页面级浮层），渲染右上角按钮与面板，通过 `host.call('git-summary', …)` 取数。
-- 仓库定位：留空时从当前会话工作区（`useSessions` 的当前会话 `cwd`，缺失时兜底最近活跃工作区路径）向上查找最近的 git 仓库；也可以在面板输入框手动指定仓库路径。
-
-## 跨环境兼容
-
-插件不依赖宿主环境的 PATH 完整性和沙箱 runner 是否可用，执行每条 git 命令时按需自动降级：
-
-1. **默认请求** —— 宿主 PATH / 沙箱正常时直接可用（绝大多数部署）；
-2. **显式标准 PATH** —— 宿主执行环境 PATH 缺少系统目录（`bash`/`bwrap`/`git` 找不到，如 `spawn bash ENOENT`）时，注入包含 `/usr/bin:/bin` 等标准目录的 PATH 重试；
-3. **标准 PATH + 无沙箱** —— 沙箱 runner（bubblewrap `bwrap`）缺失或无法启动（如 `spawn bwrap ENOENT`）时，以 `danger-full-access` 策略重试（git 命令全部只读，安全）。
-
-面板调试区（灰色小字）会显示实际命中的级别（`attempt: 1/2/3`），便于排查。
-
-## 安装
-
-## 前置条件
-
-- DeepSeek Harness 环境（提供 `shell` / `slots` 服务与 `harness`、`React`、`host`、`styles` 等运行时能力）
-- `git` ≥ 2.23，位于标准系统目录（如 `/usr/bin/git`）或宿主 PATH 中
-- bubblewrap（`bwrap`）**可选**：缺失时插件自动降级为无沙箱执行，不影响功能
-
-动态 Cordis 插件不需要 npm 安装。在 DSH 会话里让 agent 用 `cordis_define` 定义即可：
-
-1. 把 [`plugin/host.js`](plugin/host.js) 的内容作为 `code.host`；
-2. 把 [`plugin/client.js`](plugin/client.js) 的内容作为 `code.client`；
-3. `cordis_run` 激活（首次在浏览器端需要授权确认）。
-
-一个等效的说法是：把这两个文件交给会话中的 agent，让它“用 `cordis_define` 定义这个插件（host 代码在 `plugin/host.js`，client 代码在 `plugin/client.js`），然后运行它”。
-
-激活后页面右上角出现按钮，点击即可使用。
-
-## 使用方法
-
-1. 点击右上角 **⑂** 按钮打开面板；
-2. 面板自动从当前工作区向上探测 git 仓库；如果工作区不是仓库，在输入框填入仓库路径（如 `/path/to/your/repo`）回车或点“应用”；
-3. 查看摘要；点 ⟳ 刷新，点 ✕ 或再点按钮关闭。
-
-## 常见问题
-
-| 现象 | 处理 |
-| --- | --- |
-| 提示“未找到 git 仓库” | 当前工作区及其父目录都不是仓库，在面板输入框填真实仓库路径 |
-| 提示“路径不是可用的 git 仓库” | 确认路径存在且已 `git init` |
-| 面板一直转圈 | 大仓库首次计算较慢（最多约 30s/命令）；点 ⟳ 重试 |
-| 调试区显示 `spawn bash ENOENT` / `spawn bwrap ENOENT` | 宿主执行环境 PATH 缺少系统目录或沙箱 runner 不可用；插件会自动降级，若仍失败请确认 `git`/`bash` 在标准目录或宿主 PATH 中 |
-| 沙箱拒绝（`denied`） | 只读 git 命令被沙箱拦截时返回错误，可放宽沙箱策略后重试 |
+- 仓库定位：优先用当前会话 `cwd`（`useSessions`），缺失时兜底最近活跃工作区路径，向上查找最近的 git 仓库；也可在面板手动指定路径。
 
 ## 目录结构
 
 ```
 .
+├── README.md / README.en.md   # 文档（中/英）
+├── docs/
+│   ├── INSTALL.md / INSTALL.en.md  # 安装教程（中/英）
+│   └── USAGE.md / USAGE.en.md      # 使用教程（中/英）
+├── CHANGELOG.md / CHANGELOG.en.md  # 版本历史（中/英）
 ├── plugin/
-│   ├── host.js      # Host 半部（code.host 函数体）
-│   └── client.js    # Client 半部（code.client 函数体）
-├── README.md
-└── LICENSE
+│   ├── host.js        # Host 半部（code.host 函数体）
+│   └── client.js      # Client 半部（code.client 函数体）
+├── LICENSE            # MIT
+└── .gitignore
 ```
+
+## 常见问题（FAQ）
+
+| 现象 | 处理 |
+| --- | --- |
+| 提示“未找到 git 仓库” | 当前工作区及其父目录都不是仓库，在面板输入框填真实仓库路径 |
+| 提示“路径不是可用的 git 仓库” | 确认路径存在且已 `git init` |
+| 面板一直转圈 | 大仓库首次计算较慢（单条命令最多约 30s）；点 ⟳ 重试 |
+| 调试区显示 `spawn bash/bwrap ENOENT` 或 `subprocess 执行失败` | 宿主执行环境 PATH/沙箱异常，插件会自动降级；若仍失败，确认 `git`/`bash` 在标准目录或宿主 PATH 中（详见 [安装教程](docs/INSTALL.md#跨环境兼容)） |
+| 换工作区没刷新 | 面板会自动跟随当前会话工作区；如仍显示旧数据，点 ⟳ 或手动输入路径 |
+| 沙箱拒绝（`denied`） | 只读 git 命令被沙箱拦截时返回错误，可放宽沙箱策略后重试 |
 
 ## License
 
