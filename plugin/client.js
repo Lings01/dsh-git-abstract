@@ -166,17 +166,25 @@ function GroupRow(props) {
       h('span', { className: 'gs-del' }, '-' + fmt(g.deleted))))
 }
 
-function GitSummaryOverlay() {
+function GitSummaryOverlay(props) {
   const [open, setOpen] = React.useState(false)
   const [data, setData] = React.useState(null)
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState(null)
   const [repoInput, setRepoInput] = React.useState('')
 
+  // 会话列表：current 是当前会话 id，byId[current].cwd 即当前工作区路径，
+  // 作为仓库自动探测的起点（Host 端无法可靠拿到会话 cwd）。
+  const sessions = props && props.useSessions ? props.useSessions(function (s) { return s }) : null
+  const autoCwd = sessions && sessions.current && sessions.byId && sessions.byId[sessions.current]
+    ? sessions.byId[sessions.current].cwd || ''
+    : ''
+
   const load = function (repo) {
     setLoading(true)
     setError(null)
-    host.call('git-summary', repo && repo.trim() ? { repo: repo.trim() } : {}).then(function (res) {
+    const payload = repo && repo.trim() ? { repo: repo.trim() } : (autoCwd ? { start: autoCwd } : {})
+    host.call('git-summary', payload).then(function (res) {
       setData(res)
       if (!res || res.ok !== true) setError((res && res.error) || '获取失败')
       setLoading(false)
@@ -304,7 +312,7 @@ return {
     slots.inject('shell.overlay', function () {
       return slots.register(
         { name: 'shell.overlay', id: 'git-summary' },
-        function () { return h(GitSummaryOverlay, null) },
+        function (props) { return h(GitSummaryOverlay, props) },
       )
     })
   },

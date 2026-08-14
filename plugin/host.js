@@ -102,7 +102,8 @@ return {
     ctx.effect(() => harness.handle('git-summary', async (args) => {
       try {
         const explicit = args && typeof args.repo === 'string' ? args.repo.trim() : ''
-        return await computeSummary(ctx, explicit)
+        const startHint = args && typeof args.start === 'string' ? args.start.trim() : ''
+        return await computeSummary(ctx, explicit, startHint)
       } catch (err) {
         return { ok: false, error: '内部错误: ' + (err && err.message ? err.message : String(err)) }
       }
@@ -110,9 +111,9 @@ return {
   },
 }
 
-async function computeSummary(ctx, explicit) {
-  const root = await detectRepo(ctx, explicit)
-  if (root === null) return { ok: false, error: '未找到 git 仓库：当前工作区及其父目录都不是仓库，可在面板里输入仓库路径' }
+async function computeSummary(ctx, explicit, startHint) {
+  const root = await detectRepo(ctx, explicit, startHint)
+  if (root === null) return { ok: false, error: '未找到 git 仓库（已尝试会话工作区及其父目录），可在面板里输入仓库路径' }
   if (root.error) return { ok: false, error: root.error }
   const repo = root
 
@@ -256,14 +257,14 @@ async function runGit(ctx, args, cwd) {
   }
 }
 
-async function detectRepo(ctx, explicit) {
+async function detectRepo(ctx, explicit, startHint) {
   if (explicit) {
     const r = await runGit(ctx, ['rev-parse', '--show-toplevel'], explicit)
     if (r.ok && r.stdout) return r.stdout
     return { error: '路径不是可用的 git 仓库: ' + explicit + '（' + (r.stderr || ('exit ' + r.exitCode)) + '）' }
   }
   const sp = ctx.get('sandboxPolicy')
-  let dir = sp && sp.workspaceRoot ? sp.workspaceRoot : '/'
+  let dir = startHint || (sp && sp.workspaceRoot) || '/'
   while (true) {
     const r = await runGit(ctx, ['rev-parse', '--show-toplevel'], dir)
     if (r.ok && r.stdout) return r.stdout
