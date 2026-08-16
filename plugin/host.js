@@ -112,6 +112,24 @@ return {
         return { ok: false, error: '内部错误: ' + (err && err.message ? err.message : String(err)) }
       }
     }))
+    ctx.effect(() => harness.handle('git-branches', async (args) => {
+      try {
+        const explicit = args && typeof args.repo === 'string' ? args.repo.trim() : ''
+        const startHint = args && typeof args.start === 'string' ? args.start.trim() : ''
+        return await listBranches(ctx, explicit, startHint)
+      } catch (err) {
+        return { ok: false, error: '内部错误: ' + (err && err.message ? err.message : String(err)) }
+      }
+    }))
+    ctx.effect(() => harness.handle('git-checkout', async (args) => {
+      try {
+        const repo = args && typeof args.repo === 'string' ? args.repo.trim() : ''
+        const branch = args && typeof args.branch === 'string' ? args.branch.trim() : ''
+        return await checkoutBranch(ctx, repo, branch)
+      } catch (err) {
+        return { ok: false, error: '内部错误: ' + (err && err.message ? err.message : String(err)) }
+      }
+    }))
   },
 }
 
@@ -382,4 +400,42 @@ async function detectRepo(ctx, explicit, startHint) {
     if (next === dir) return null
     dir = next
   }
+}
+
+// 列出本地分支（含当前分支标记、upstream 领先/落后）与远程分支
+async function listBranches(ctx, explicit, startHint) {
+  const root = await detectRepo(ctx, explicit, startHint)
+  if (root === null) return { ok: false, error: '未找到 git 仓库（已尝试会话工作区及其父目录），可在面板里输入仓库路径' }
+  if (root.error) return { ok: false, error: root.error }
+  const repo = root
+  const out = { ok: true, repo: repo, current: '', branches: [], remotes: [] }
+  const curR = await runGit(ctx, ['branch', '--show-current'], repo)
+  if (curR.ok) out.current = curR.stdout.trim()
+  const brR = await runGit(ctx, ['for-each-ref', '--format=%(HEAD)%09%(refname:short)%09%(upstream:short)%09%(upstream:track)', 'refs/heads'], repo)
+  if (brR.ok) {
+    for (const line of brR.stdout.split('\n')) {
+      if (!line.trim()) continue
+      const parts = line.split('\t')
+      out.branches.push({
+        name: parts[1] || '',
+        isCurrent: parts[0] === '*',
+        upstream: parts[2] || '',
+        track: parts[3] || '',
+      })
+    }
+  }
+  const remR = await runGit(ctx, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes'], repo)
+  if (remR.ok) {
+    out.remotes = remR.stdout.split('\n').filter(Boolean).filter(function (r) { return !r.endsWith('/HEAD') })
+  }
+  return out
+}
+
+// 切换分支（git checkout，写操作，由用户在面板点击触发）
+async function checkoutBranch(ctx, repo, branch) {
+  if (!repo) return { ok: false, error: '缺少仓库路径' }
+  if (!branch) return { ok: false, error: '缺少分支名' }
+  const r = await runGit(ctx, ['checkout', branch], repo)
+  if (r.ok) return { ok: true, repo: repo, branch: branch, output: (r.stderr || r.stdout).trim() }
+  return { ok: false, repo: repo, branch: branch, error: (r.stderr || ('exit ' + r.exitCode)).trim().slice(0, 600) }
 }

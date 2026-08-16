@@ -18,6 +18,16 @@ const CSS = [
   ".gs-entry{display:inline-flex;align-items:center}",
   ".gs-fab{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));background:transparent;color:var(--dsw-alias-label-secondary,#cfd3d6);cursor:pointer;font-size:14px;line-height:1;transition:background .15s,color .15s,border-color .15s}",
   ".gs-fab:hover{background:var(--dsw-alias-bg-layer-1,#232324);border-color:var(--dsw-alias-border-l2,rgba(255,255,255,.12));color:var(--dsw-alias-label-primary,#f9fafb)}",
+  ".gs-branch{display:inline-flex;align-items:center;gap:4px;max-width:150px;height:28px;margin-right:4px;padding:0 8px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));background:var(--dsw-alias-bg-layer-1,#232324);color:var(--dsw-alias-label-primary,#f9fafb);font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:border-color .15s,color .15s}",
+  ".gs-branch:hover{border-color:var(--dsw-alias-border-l2,rgba(255,255,255,.12))}",
+  ".gs-blist{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow-y:auto}",
+  ".gs-brow{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;font-size:12px}",
+  ".gs-brow:hover{background:var(--dsw-alias-bg-layer-2,#2c2c2e)}",
+  ".gs-brow-current{background:var(--dsw-alias-bg-layer-2,#2c2c2e)}",
+  ".gs-bname{flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
+  ".gs-bmark{color:#22c55e;font-size:10px}",
+  ".gs-btrack{color:var(--dsw-alias-label-secondary,#cfd3d6);font-size:10px}",
+  ".gs-bswitching{color:var(--dsw-alias-label-secondary,#cfd3d6);font-size:10px}",
   ".gs-panel{position:fixed;top:48px;right:16px;z-index:2147483000;width:min(540px,calc(100vw - 24px));max-height:calc(100vh - 90px);overflow-y:auto;background:var(--dsw-alias-bg-overlay,#1b1b1f);border:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06));border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.45);color:var(--dsw-alias-label-primary,#f9fafb);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:12px;pointer-events:auto}",
   ".gs-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1,rgba(255,255,255,.06))}",
   ".gs-title{font-size:13px;font-weight:600}",
@@ -216,10 +226,47 @@ function GitSummaryOverlay(props) {
     if (open) load(repoInput)
   }, [autoCwd])
 
+  // 分支信息：按钮旁显示当前分支，面板内可切换
+  const [branches, setBranches] = React.useState(null)
+  const [switching, setSwitching] = React.useState(null)
+
+  const loadBranches = function () {
+    host.call('git-branches', autoCwd ? { start: autoCwd } : {}).then(function (res) {
+      setBranches(res && res.ok ? res : null)
+    }, function () {
+      setBranches(null)
+    })
+  }
+
+  React.useEffect(function () {
+    loadBranches()
+  }, [autoCwd])
+
+  const checkout = function (name) {
+    if (!data || !data.ok || !data.repo || switching) return
+    setSwitching(name)
+    host.call('git-checkout', { repo: data.repo, branch: name }).then(function (res) {
+      setSwitching(null)
+      if (res && res.ok) {
+        load(repoInput)
+        loadBranches()
+      } else {
+        setError((res && res.error) || '切换分支失败')
+      }
+    }, function (err) {
+      setSwitching(null)
+      setError('切换失败: ' + String((err && err.message) || err))
+    })
+  }
+
   const fab = h('button', { className: 'gs-fab', title: 'Git 变更摘要', onClick: function () { setOpen(!open) } },
     h('span', { className: 'gs-fab-icon' }, '⑂'))
 
-  if (!open) return h('div', { className: 'gs-entry' }, fab)
+  const pill = branches && branches.current
+    ? h('button', { className: 'gs-branch', title: '当前分支 ' + branches.current + '，点击打开摘要/切换', onClick: function () { setOpen(!open) } }, branches.current, ' ▾')
+    : null
+
+  if (!open) return h('div', { className: 'gs-entry' }, pill, fab)
 
   const header = h('div', { className: 'gs-head' },
     h('div', { className: 'gs-head-l' },
@@ -286,6 +333,16 @@ function GitSummaryOverlay(props) {
       content.push(h('div', { key: 'unborn', className: 'gs-empty' }, '仓库还没有提交（unborn branch），仅显示未跟踪文件。'))
     } else {
       const secs = []
+      if (branches && branches.branches && branches.branches.length) {
+        const rows = list(branches.branches, function (b, i) {
+          const mark = b.isCurrent ? h('span', { className: 'gs-bmark' }, '●') : null
+          const track = b.track ? h('span', { className: 'gs-btrack' }, b.track) : null
+          const sw = switching === b.name ? h('span', { className: 'gs-bswitching' }, '切换中…') : null
+          return h('div', { key: i, className: 'gs-brow' + (b.isCurrent ? ' gs-brow-current' : ''), onClick: b.isCurrent ? null : function () { checkout(b.name) }, title: b.isCurrent ? '当前分支' : '切换到 ' + b.name },
+            mark, h('span', { className: 'gs-bname' }, b.name), track, sw)
+        })
+        secs.push(h(Section, { key: 'branches', title: '切换分支', badge: branches.branches.length + ' 个', children: h('div', { className: 'gs-blist' }, rows) }))
+      }
       secs.push(h(Section, { key: 'un', title: '未提交变更（相对 HEAD）', badge: h(StatBadge, { stats: un.stats }), children: h(FileList, { files: un.files }) }))
       secs.push(h(Section, { key: 'st', title: '已暂存 (staged)', badge: h(StatBadge, { stats: d.staged.stats }), children: h(FileList, { files: d.staged.files }) }))
       secs.push(h(Section, { key: 'us', title: '未暂存 (unstaged)', badge: h(StatBadge, { stats: d.unstaged.stats }), children: h(FileList, { files: d.unstaged.files }) }))
@@ -333,7 +390,7 @@ function GitSummaryOverlay(props) {
     content.push(h('div', { key: 'time', className: 'gs-time' }, '生成于 ' + fmtDate(d.generatedAt)))
   }
 
-  return h('div', { className: 'gs-entry' }, fab, h('div', { className: 'gs-panel' }, header, toolbar, h('div', { className: 'gs-body' }, content)))
+  return h('div', { className: 'gs-entry' }, pill, fab, h('div', { className: 'gs-panel' }, header, toolbar, h('div', { className: 'gs-body' }, content)))
 }
 
 return {
